@@ -674,7 +674,7 @@ async function init() {
     e.preventDefault();
     $('loginErr').textContent = '';
     const { error } = await db.auth.signInWithPassword({ email: $('email').value, password: $('password').value });
-    if (error) $('loginErr').textContent = 'Wrong email or password. Check both and try again.';
+    if (error) $('loginErr').textContent = `Sign-in failed: ${error.message}`;
     else startBoard();
   });
 }
