@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tasks</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tasks">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#EEF1F6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141A24" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+/* ---------- Tokens ---------- */
+:root {
+  color-scheme: light;
+  --ground: #EEF1F6;
+  --surface: #FFFFFF;
+  --ink: #1A2233;
+  --muted: #5B6578;
+  --line: #D5DBE5;
+  --late: #C92A5E;
+  --work: #D7DEFF;
+  --personal: #FFE7A3;
+  --errands: #FFD3CB;
+  --ideas: #CFEBDD;
+  --tile-ink: #1A2233;
+  --radius-tile: 18px;
+  --font: "Bricolage Grotesque", ui-rounded, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --ground: #141A24;
+    --surface: #1E2533;
+    --ink: #E8ECF4;
+    --muted: #98A2B5;
+    --line: #2C3546;
+    --late: #FF7AA2;
+    --work: #2F3A6E;
+    --personal: #5C4A16;
+    --errands: #633129;
+    --ideas: #22493A;
+    --tile-ink: #F1F3F8;
+  }
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2.5px solid var(--ink); outline-offset: 2px; }
+.hidden { display: none !important; }
+
+/* ---------- Header ---------- */
+header {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px 20px 8px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 7vw, 3.4rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+.count { color: var(--muted); font-size: 0.95rem; margin-top: 6px; }
+.textline { color: var(--muted); font-size: 0.95rem; text-align: right; }
+.textline a { color: var(--ink); font-weight: 500; text-decoration: none; border-bottom: 1.5px solid var(--line); }
+
+/* ---------- Filters ---------- */
+.bar {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 10px 20px 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.bar::-webkit-scrollbar { display: none; }
+.chip {
+  flex: none;
+  border: 1.5px solid var(--line);
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 0.92rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.chip .dot { width: 10px; height: 10px; border-radius: 50%; }
+.bar .spacer { flex: 1; min-width: 8px; }
+
+/* ---------- Grid ---------- */
+main { max-width: 1200px; margin: 0 auto; padding: 0 20px 140px; }
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  grid-auto-flow: dense;
+  gap: 12px;
+}
+.tile {
+  position: relative;
+  background: var(--personal);
+  color: var(--tile-ink);
+  border-radius: var(--radius-tile);
+  padding: 14px 14px 12px;
+  min-height: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  text-align: left;
+}
+.tile[data-cat="work"] { background: var(--work); }
+.tile[data-cat="errands"] { background: var(--errands); }
+.tile[data-cat="ideas"] { background: var(--ideas); }
+.tile.high { grid-column: span 2; }
+.tile.high .title { font-size: 1.35rem; }
+.tile.late { border-color: var(--late); }
+.tile.done { opacity: 0.5; }
+.tile.done .title { text-decoration: line-through; }
+.title {
+  font-size: 1.08rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  word-break: break-word;
+  padding-right: 34px;
+}
+.notes {
+  font-size: 0.88rem;
+  opacity: 0.75;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.meta {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+.meta .due-late { color: var(--late); font-weight: 700; opacity: 1; }
+.meta svg { width: 14px; height: 14px; flex: none; }
+.check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  background: transparent;
+  opacity: 0.55;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+.check:hover { opacity: 1; }
+.check svg { width: 16px; height: 16px; opacity: 0; }
+.tile.done .check { background: var(--tile-ink); opacity: 1; }
+.tile.done .check svg { opacity: 1; color: var(--ground); }
+
+/* One motion: a texted task lands on the board */
+@keyframes land {
+  0%   { transform: scale(0.6) translateY(16px); opacity: 0; }
+  70%  { transform: scale(1.03); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.tile.landed { animation: land 420ms cubic-bezier(.2,.9,.3,1.2); }
+@media (prefers-reduced-motion: reduce) { .tile.landed { animation: none; } }
+
+.empty {
+  grid-column: 1 / -1;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--muted);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-tile);
+}
+.empty strong { display: block; color: var(--ink); font-size: 1.3rem; font-weight: 500; margin-bottom: 4px; }
+
+.done-head { margin: 36px 0 12px; font-size: 1rem; font-weight: 500; color: var(--muted); }
+
+/* ---------- Quick add ---------- */
+.add {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, var(--ground) 65%, transparent);
+}
+.add form {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  gap: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 6px 6px 18px;
+}
+.add input { flex: 1; border: 0; background: transparent; outline: none; min-width: 0; font-size: 16px; }
+.btn {
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--ground);
+  padding: 9px 18px;
+  font-weight: 500;
+}
+.btn.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+.btn.danger { background: transparent; color: var(--late); border: 1.5px solid var(--line); }
+
+/* ---------- Edit sheet ---------- */
+dialog {
+  border: 0;
+  padding: 0;
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--ink);
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+}
+dialog::backdrop { background: rgb(10 14 22 / 0.45); }
+.sheet { padding: 20px; display: grid; gap: 14px; }
+.sheet label { display: grid; gap: 6px; font-size: 0.88rem; color: var(--muted); }
+.sheet textarea, .sheet input, .sheet select {
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--ground);
+  padding: 10px 12px;
+  font-size: 16px;
+  color: var(--ink);
+  width: 100%;
+}
+.sheet textarea.big { font-size: 1.2rem; font-weight: 500; resize: vertical; min-height: 64px; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.seg { display: flex; gap: 6px; }
+.seg button { flex: 1; }
+.actions { display: flex; gap: 8px; justify-content: space-between; margin-top: 4px; }
+.actions .right { display: flex; gap: 8px; }
+
+/* ---------- Login ---------- */
+.login {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.login form { width: min(360px, 100%); display: grid; gap: 12px; }
+.login h1 { margin-bottom: 8px; }
+.login input {
+  border: 1.5px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 12px 14px;
+  font-size: 16px;
+}
+.err { color: var(--late); font-size: 0.9rem; min-height: 1.2em; }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--ground);
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.toast button { background: none; border: 0; color: inherit; font-weight: 700; padding: 0; }
+
+@media (max-width: 420px) {
+  header { padding: 16px 14px 6px; }
+  .textline { display: none; }
+  .bar { padding: 8px 14px 12px; }
+  main { padding: 0 14px 130px; }
+  .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile { min-height: 118px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Login screen (hidden in demo mode) -->
+<section class="login hidden" id="login">
+  <form id="loginForm">
+    <h1>Tasks</h1>
+    <input type="email" id="email" placeholder="Email" autocomplete="username" required>
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password" required>
+    <button class="btn" type="submit">Sign in</button>
+    <div class="err" id="loginErr"></div>
+  </form>
+</section>
+
+<!-- Board -->
+<section id="app" class="hidden">
+  <header>
+    <div>
+      <h1>Tasks</h1>
+      <div class="count" id="count"></div>
+    </div>
+    <div class="textline" id="textline"></div>
+  </header>
+
+  <nav class="bar" id="bar" aria-label="Filter tasks"></nav>
+
+  <main>
+    <div class="grid" id="grid"></div>
+    <div id="doneWrap" class="hidden">
+      <h2 class="done-head">Done</h2>
+      <div class="grid" id="doneGrid"></div>
+    </div>
+  </main>
+
+  <div class="add">
+    <form id="addForm">
+      <input id="addInput" placeholder="Add a task" autocomplete="off" aria-label="New task">
+      <button class="btn" type="submit">Add</button>
+    </form>
+  </div>
+</section>
+
+<!-- Edit sheet -->
+<dialog id="editor">
+  <form class="sheet" id="editForm" method="dialog">
+    <label>Task<textarea class="big" id="fTitle" rows="2" required></textarea></label>
+    <label>Notes<textarea id="fNotes" rows="3"></textarea></label>
+    <div class="row">
+      <label>Due<input type="date" id="fDue"></label>
+      <label>Category<select id="fCat"></select></label>
+    </div>
+    <label>Priority
+      <div class="seg" id="fPri">
+        <button type="button" class="btn ghost" data-v="low">Low</button>
+        <button type="button" class="btn ghost" data-v="normal">Normal</button>
+        <button type="button" class="btn ghost" data-v="high">High</button>
+      </div>
+    </label>
+    <div class="actions">
+      <button type="button" class="btn danger" id="fDelete">Delete</button>
+      <div class="right">
+        <button type="button" class="btn ghost" id="fCancel">Cancel</button>
+        <button type="submit" class="btn" id="fSave">Save</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast hidden" id="toast"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
+
+<script>
+// ===== Config: paste your Supabase values here (leave blank to preview with sample tasks) =====
+const CONFIG = {
+  SUPABASE_URL: 'https://mgtvblbdotjtbndagyrk.supabase.co/rest/v1/',        // e.g. https://abcd1234.supabase.co
+  SUPABASE_ANON_KEY: 'sb_publishable_2QR1ch0ftUrx_yfzLYEOpA_W8zcxhiZ',   // the "anon public" key, safe to put in the page
+  TEXT_NUMBER: '',         // your Twilio number for the header, e.g. +15035550100
+};
+const CATEGORIES = [
+  { id: 'work', label: 'Work' },
+  { id: 'personal', label: 'Personal' },
+  { id: 'errands', label: 'Errands' },
+  { id: 'ideas', label: 'Ideas' },
+];
+
+// ===== State =====
+const DEMO = !CONFIG.SUPABASE_URL;
+let db = null;
+let tasks = [];
+let filter = 'all';
+let sort = 'newest';
+let showDone = false;
+let editingId = null;
+let editPriority = 'normal';
+const $ = (id) => document.getElementById(id);
+
+// ===== Data layer =====
+async function loadTasks() {
+  if (DEMO) { tasks = sampleTasks(); return; }
+  const { data, error } = await db.from('tasks').select('*').order('created_at', { ascending: false });
+  if (error) return showToast('Couldn’t load tasks: ' + error.message);
+  tasks = data;
+}
+
+async function addTask(fields) {
+  const base = { category: 'personal', priority: 'normal', due_date: null, notes: null, done: false, source: 'web', ...fields };
+  if (DEMO) {
+    const t = { ...base, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+    upsertLocal(t, true);
+    return;
+  }
+  const { data, error } = await db.from('tasks').insert(base).select().single();
+  if (error) return showToast('Couldn’t add task: ' + error.message);
+  upsertLocal(data, true);
+}
+
+async function updateTask(id, patch) {
+  const t = tasks.find((x) => x.id === id);
+  if (!t) return;
+  Object.assign(t, patch);
+  render();
+  if (DEMO) return;
+  const { error } = await db.from('tasks').update(patch).eq('id', id);
+  if (error) showToast('Couldn’t save: ' + error.message);
+}
+
+async function deleteTask(id) {
+  const t = tasks.find((x) => x.id === id);
+  tasks = tasks.filter((x) => x.id !== id);
+  render();
+  if (!DEMO) {
+    const { error } = await db.from('tasks').delete().eq('id', id);
+    if (error) { showToast('Couldn’t delete: ' + error.message); return; }
+  }
+  showToast('Deleted', async () => {
+    const { id: _drop, ...rest } = t;
+    if (DEMO) upsertLocal(t); else await addTask(rest);
+  });
+}
+
+function upsertLocal(t, landed = false) {
+  const i = tasks.findIndex((x) => x.id === t.id);
+  if (i >= 0) tasks[i] = t; else tasks.unshift(t);
+  render(landed && i < 0 ? t.id : null);
+}
+
+function listenLive() {
+  if (DEMO) return;
+  db.channel('tasks-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, (p) => {
+      if (p.eventType === 'DELETE') { tasks = tasks.filter((x) => x.id !== p.old.id); render(); }
+      else upsertLocal(p.new, p.eventType === 'INSERT');
+    })
+    .subscribe();
+  // Refresh when the app comes back to the foreground (phones pause live connections)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') loadTasks().then(() => render());
+  });
+}
+
+// ===== Dates =====
+function parseDay(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function startOfToday() { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }
+function daysUntil(s) { return Math.round((parseDay(s) - startOfToday()) / 86400000); }
+function dueLabel(s) {
+  const n = daysUntil(s);
+  if (n < -1) return { text: `${-n} days late`, late: true };
+  if (n === -1) return { text: 'Due yesterday', late: true };
+  if (n === 0) return { text: 'Today', late: false };
+  if (n === 1) return { text: 'Tomorrow', late: false };
+  const d = parseDay(s);
+  if (n < 7) return { text: d.toLocaleDateString(undefined, { weekday: 'long' }), late: false };
+  return { text: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), late: false };
+}
+function isoFromToday(offset) {
+  const d = startOfToday(); d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ===== Rendering =====
+const ICON_TEXT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M2.5 4.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H7l-3 2.5v-2.5h0a2 2 0 0 1-1.5-2z"/></svg>';
+const ICON_CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function tileHTML(t, landedId) {
+  const due = t.due_date ? dueLabel(t.due_date) : null;
+  const late = due && due.late && !t.done;
+  const cls = ['tile', t.priority === 'high' && !t.done ? 'high' : '', late ? 'late' : '', t.done ? 'done' : '', t.id === landedId ? 'landed' : ''].join(' ');
+  return `
+    <article class="${cls}" data-id="${t.id}" data-cat="${esc(t.category)}" tabindex="0" aria-label="${esc(t.title)}">
+      <button class="check" data-check="${t.id}" aria-label="${t.done ? 'Mark not done' : 'Mark done'}">${ICON_CHECK}</button>
+      <div class="title">${esc(t.title)}</div>
+      ${t.notes ? `<div class="notes">${esc(t.notes)}</div>` : ''}
+      <div class="meta">
+        ${due ? `<span class="${late ? 'due-late' : ''}">${esc(due.text)}</span>` : ''}
+        ${t.source === 'sms' ? `<span title="Added by text">${ICON_TEXT}</span>` : ''}
+      </div>
+    </article>`;
+}
+
+function sorted(list) {
+  const copy = [...list];
+  if (sort === 'due') {
+    copy.sort((a, b) => {
+      if (!a.due_date && !b.due_date) return b.created_at.localeCompare(a.created_at);
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date.localeCompare(b.due_date);
+    });
+  } else {
+    copy.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  }
+  return copy;
+}
+
+function render(landedId = null) {
+  const inView = tasks.filter((t) => filter === 'all' || t.category === filter);
+  const open = sorted(inView.filter((t) => !t.done));
+  const done = inView.filter((t) => t.done).sort((a, b) => (b.done_at || '').localeCompare(a.done_at || ''));
+
+  $('grid').innerHTML = open.length
+    ? open.map((t) => tileHTML(t, landedId)).join('')
+    : `<div class="empty"><strong>Nothing on the board</strong>${CONFIG.TEXT_NUMBER ? `Text ${esc(prettyPhone(CONFIG.TEXT_NUMBER))} or type below to add a task.` : 'Type below to add a task.'}</div>`;
+
+  $('doneWrap').classList.toggle('hidden', !showDone || !done.length);
+  $('doneGrid').innerHTML = showDone ? done.map((t) => tileHTML(t)).join('') : '';
+
+  const lateCount = open.filter((t) => t.due_date && daysUntil(t.due_date) < 0).length;
+  $('count').textContent = `${open.length} open` + (lateCount ? `, ${lateCount} late` : '');
+  renderBar();
+}
+
+function renderBar() {
+  const chips = [{ id: 'all', label: 'All' }, ...CATEGORIES].map((c) => `
+    <button class="chip" data-filter="${c.id}" aria-pressed="${filter === c.id}">
+      ${c.id !== 'all' ? `<span class="dot" style="background:var(--${c.id})"></span>` : ''}${esc(c.label)}
+    </button>`).join('');
+  $('bar').innerHTML = chips + `
+    <span class="spacer"></span>
+    <button class="chip" data-sort aria-pressed="${sort === 'due'}">${sort === 'due' ? 'By due date' : 'Newest first'}</button>
+    <button class="chip" data-done aria-pressed="${showDone}">${showDone ? 'Hide done' : 'Show done'}</button>
+    ${DEMO ? '' : '<button class="chip" data-signout>Sign out</button>'}`;
+}
+
+function prettyPhone(n) {
+  const d = n.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '');
+  return d.length === 10 ? `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}` : n;
+}
+
+// ===== Editor =====
+function openEditor(id) {
+  const t = tasks.find((x) => x.id === id);
+  if (!t) return;
+  editingId = id;
+  $('fTitle').value = t.title;
+  $('fNotes').value = t.notes || '';
+  $('fDue').value = t.due_date || '';
+  $('fCat').value = t.category;
+  setPriority(t.priority);
+  $('editor').showModal();
+}
+function setPriority(v) {
+  editPriority = v;
+  $('fPri').querySelectorAll('button').forEach((b) => {
+    const on = b.dataset.v === v;
+    b.classList.toggle('ghost', !on);
+    b.setAttribute('aria-pressed', on);
+  });
+}
+
+// ===== Toast =====
+let toastTimer;
+function showToast(msg, undo) {
+  $('toastMsg').textContent = msg;
+  $('toastUndo').classList.toggle('hidden', !undo);
+  $('toastUndo').onclick = () => { $('toast').classList.add('hidden'); undo && undo(); };
+  $('toast').classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 4000);
+}
+
+// ===== Events =====
+function wireEvents() {
+  $('fCat').innerHTML = CATEGORIES.map((c) => `<option value="${c.id}">${esc(c.label)}</option>`).join('');
+  if (CONFIG.TEXT_NUMBER) {
+    $('textline').innerHTML = `Text <a href="sms:${esc(CONFIG.TEXT_NUMBER)}">${esc(prettyPhone(CONFIG.TEXT_NUMBER))}</a> to add`;
+  }
+
+  document.addEventListener('click', (e) => {
+    const check = e.target.closest('[data-check]');
+    if (check) {
+      const t = tasks.find((x) => x.id === check.dataset.check);
+      const nowDone = !t.done;
+      updateTask(t.id, { done: nowDone, done_at: nowDone ? new Date().toISOString() : null });
+      if (nowDone) showToast('Done', () => updateTask(t.id, { done: false, done_at: null }));
+      return;
+    }
+    const tile = e.target.closest('.tile');
+    if (tile) return openEditor(tile.dataset.id);
+    const f = e.target.closest('[data-filter]');
+    if (f) { filter = f.dataset.filter; return render(); }
+    if (e.target.closest('[data-sort]')) { sort = sort === 'newest' ? 'due' : 'newest'; return render(); }
+    if (e.target.closest('[data-done]')) { showDone = !showDone; return render(); }
+    if (e.target.closest('[data-signout]')) { db.auth.signOut().then(() => location.reload()); }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('tile')) {
+      e.preventDefault();
+      openEditor(e.target.dataset.id);
+    }
+  });
+
+  $('addForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = $('addInput').value.trim();
+    if (!title) return;
+    addTask({ title, category: filter === 'all' ? 'personal' : filter });
+    $('addInput').value = '';
+  });
+
+  $('fPri').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setPriority(b.dataset.v); });
+  $('fCancel').addEventListener('click', () => $('editor').close());
+  $('fDelete').addEventListener('click', () => { $('editor').close(); deleteTask(editingId); });
+  $('editForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const title = $('fTitle').value.trim();
+    if (!title) return;
+    updateTask(editingId, {
+      title,
+      notes: $('fNotes').value.trim() || null,
+      due_date: $('fDue').value || null,
+      category: $('fCat').value,
+      priority: editPriority,
+    });
+    $('editor').close();
+  });
+  $('editor').addEventListener('click', (e) => { if (e.target === $('editor')) $('editor').close(); });
+}
+
+// ===== Startup =====
+async function startBoard() {
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  await loadTasks();
+  render();
+  listenLive();
+}
+
+async function init() {
+  wireEvents();
+  if (DEMO) { startBoard(); demoArrival(); return; }
+
+  db = supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+  const { data: { session } } = await db.auth.getSession();
+  if (session) return startBoard();
+
+  $('login').classList.remove('hidden');
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('loginErr').textContent = '';
+    const { error } = await db.auth.signInWithPassword({ email: $('email').value, password: $('password').value });
+    if (error) $('loginErr').textContent = 'Wrong email or password. Check both and try again.';
+    else startBoard();
+  });
+}
+
+// ===== Demo mode =====
+function sampleTasks() {
+  const ago = (min) => new Date(Date.now() - min * 60000).toISOString();
+  return [
+    { id: 'd1', title: 'Send proposal draft', category: 'work', priority: 'high', due_date: isoFromToday(0), notes: 'Attach the updated timeline', done: false, source: 'sms', created_at: ago(20) },
+    { id: 'd2', title: 'Pick up dry cleaning', category: 'errands', priority: 'normal', due_date: isoFromToday(4), notes: null, done: false, source: 'sms', created_at: ago(90) },
+    { id: 'd3', title: 'Book dentist appointment', category: 'personal', priority: 'normal', due_date: isoFromToday(-2), notes: null, done: false, source: 'web', created_at: ago(3000) },
+    { id: 'd4', title: 'App idea: shared grocery tiles', category: 'ideas', priority: 'low', due_date: null, notes: 'Same board, but each tile is an item and anyone in the house can text it', done: false, source: 'sms', created_at: ago(400) },
+    { id: 'd5', title: 'Review survey draft', category: 'work', priority: 'normal', due_date: isoFromToday(1), notes: null, done: false, source: 'web', created_at: ago(600) },
+    { id: 'd6', title: 'Buy AA batteries', category: 'errands', priority: 'low', due_date: null, notes: null, done: false, source: 'sms', created_at: ago(1500) },
+    { id: 'd7', title: 'Call Mom back', category: 'personal', priority: 'normal', due_date: null, notes: null, done: true, done_at: ago(30), source: 'sms', created_at: ago(2000) },
+  ];
+}
+// Simulates a text arriving a few seconds after load so you can see how new tasks land
+function demoArrival() {
+  setTimeout(() => upsertLocal({
+    id: 'd8', title: 'Renew car registration', category: 'errands', priority: 'high',
+    due_date: isoFromToday(2), notes: null, done: false, source: 'sms', created_at: new Date().toISOString(),
+  }, true), 2500);
+}
+
+init();
+</script>
+</body>
+</html>
